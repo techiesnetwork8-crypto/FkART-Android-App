@@ -1,1 +1,55 @@
+name: Build FKART APK
 
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract FKART project ZIP
+        run: |
+          ZIP=$(find . -maxdepth 1 -type f -name 'FKART-Corrected-APK-Builder.zip' -print -quit)
+          test -n "$ZIP"
+          mkdir -p build-src
+          unzip -q "$ZIP" -d build-src
+          PROJECT=$(find build-src -type f -name settings.gradle -printf '%h\n' | head -1)
+          test -n "$PROJECT"
+          echo "PROJECT=$PROJECT" >> "$GITHUB_ENV"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT"
+          gradle --no-daemon --stacktrace assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FKART-COM-debug-apk
+          path: '**/app/build/outputs/apk/debug/app-debug.apk'
